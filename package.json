@@ -1,0 +1,19 @@
+{
+  "name": "SmartBlinds",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "private": true,
+  "dependencies": {
+    "express": "^5.1.0",
+    "firebase": "^12.6.0",
+    "firebase-admin": "^13.6.0",
+    "nodemon": "^3.1.11",
+    "prettier": "^3.6.2",
+    "vite": "^7.2.4",
+    "vive": "^0.0.0"
+  }
+}
