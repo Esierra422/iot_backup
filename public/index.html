@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Blinds Control</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Smart Blinds Control Panel</h1>
+
+        <div class="sections-row">
+            <div class="section">
+                <h2>Sensor Readings</h2>
+                <div class="sensor-grid">
+                    <div class="sensor-card">
+                        <div class="sensor-label">Light Intensity (LDR)</div>
+                        <div class="sensor-value" id="ldrValue">--</div>
+                    </div>
+                    <div class="sensor-card">
+                        <div class="sensor-label">Voltage</div>
+                        <div class="sensor-value" id="voltageValue">--</div>
+                    </div>
+                    <div class="sensor-card">
+                        <div class="sensor-label">Mode</div>
+                        <div class="sensor-value" id="manualValue">--</div>
+                    </div>
+                    <div class="sensor-card">
+                        <div class="sensor-label">Motor Turn</div>
+                        <div class="sensor-value" id="turnValue">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>Blind Controls</h2>
+            <h3>Mode Control</h3>
+            <div class="button-group">
+                <button class="btn-on" onclick="setMode(false)"> Light Mode</button>
+                <button class="btn-off" onclick="setMode(true)"> Manual Mode</button>
+            </div>
+
+            <h3>Blind Movement</h3>
+            <div class="button-group">
+                <button class="btn-on" id="turnButtonFalse" onclick="turnBlindsCW(true)">Open Blinds</button>
+                <button class="btn-off" id="turnButtonTrue" onclick="turnBlindsCounterCW(true)">Close Blinds</button>
+            </div>
+            </div>
+        </div>
+
+        <div class="section" style="display: none;">
+            <h2>Create New Firebase Node</h2>
+            <p style="color: #666; margin-bottom: 20px;">Use this form to create new variables/nodes in Firebase</p>
+            
+            <div style="display: grid; gap: 15px;">
+                <div>
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4A90E2;">Firebase Path:</label>
+                    <input type="text" id="nodePath" placeholder="e.g., Settings/autoMode" 
+                           style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 1rem;">
+                    <small style="color: #666;">Path where the node will be created (e.g., "MyNode" or "Settings/value")</small>
+                </div>
+                
+                <div>
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4A90E2;">Data Type:</label>
+                    <select id="nodeType" style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 1rem;">
+                        <option value="boolean">Boolean (true/false)</option>
+                        <option value="number">Number</option>
+                        <option value="string">String (text)</option>
+                        <option value="object">Object (JSON)</option>
+                        <option value="array">Array</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #4A90E2;">Value:</label>
+                    <input type="text" id="nodeValue" placeholder="Enter value (e.g., true, 42, 'Hello', etc.)" 
+                           style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 1rem;">
+                    <small style="color: #666;">For objects/arrays, use JSON format: {"key": "value"} or [1,2,3]</small>
+                </div>
+                
+                <button class="btn-turn" onclick="createNode()" style="margin-top: 10px;">Create Node</button>
+                
+                <div id="createResult" style="margin-top: 15px; padding: 15px; border-radius: 8px; display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // Fetch data from server
+    async function fetchData() {
+        const sensorResponse = await fetch('/sensor');
+        const sensorData = await sensorResponse.json();
+
+        const motorResponse = await fetch('/motor');
+        const motorData = await motorResponse.json();
+
+        // Display sensor data
+        document.getElementById('ldrValue').innerText = sensorData.ldr || 0;
+        document.getElementById('voltageValue').innerText = sensorData.voltage || 0.0;
+        
+        // Format boolean values nicely
+        const manual = motorData.manual;
+        const turnCW = motorData.turnCW;
+        const turnCounterCW = motorData.turnCounterCW;
+        
+        // Display mode: true = Manual Mode, false = Light Mode
+        const modeText = (manual === true || manual === 'true') ? 'Manual' : 'Light';
+        document.getElementById('manualValue').innerText = modeText;
+        document.getElementById('turnValue').innerText = turnCW ? 'Opening' : (turnCounterCW ? 'Closing' : 'Stopped');
+        
+        // Enable/disable turn buttons based on mode
+        // In light mode (manual = false), disable buttons (auto-control is active)
+        // In manual mode (manual = true), enable buttons (user can control)
+        const turnButtonTrue = document.getElementById('turnButtonTrue');
+        const turnButtonFalse = document.getElementById('turnButtonFalse');
+        
+        if (manual === true || manual === 'true') {
+            // Manual mode - enable buttons
+            turnButtonTrue.disabled = false;
+            turnButtonTrue.style.opacity = '1';
+            turnButtonFalse.disabled = false;
+            turnButtonFalse.style.opacity = '1';
+        } else {
+            // Light mode - disable buttons (auto-control)
+            turnButtonTrue.disabled = true;
+            turnButtonTrue.style.opacity = '0.6';
+            turnButtonFalse.disabled = true;
+            turnButtonFalse.style.opacity = '0.6';
+        }
+    }
+
+    // Set mode: true = Manual Mode, false = Light Mode
+    async function setMode(isManual) {
+        const response = await fetch('/blinds/isManual', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({state: isManual})
+        });
+        if (response.ok) {
+            console.log("Mode command sent!");
+            // Refresh data after a short delay
+            setTimeout(fetchData, 500);
+        }
+    }
+
+    // trigger signal to turn blinds
+    async function turnBlindsCW(state) {
+        const response = await fetch('/blinds/turnCW', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({state: state})
+        });
+        if (response.ok) {
+            console.log("Turn command sent!");
+            // Refresh data after a short delay
+            setTimeout(fetchData, 500);
+        }
+    }
+
+    // trigger signal to turn blinds
+    async function turnBlindsCounterCW(state) {
+      const response = await fetch('/blinds/turnCounterCW', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({state: state})
+      });
+      if (response.ok) {
+        console.log("Turn command sent!");
+        // Refresh data after a short delay
+        setTimeout(fetchData, 500);
+      }
+    }
+    // Auto-refresh data every 5 seconds
+    setInterval(fetchData, 5000);
+    window.onload = fetchData();
+</script>
+</body>
+</html>
